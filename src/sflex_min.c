@@ -1,11 +1,16 @@
 #include "sflex.h"
 
 #include <string.h>
+#include <stdlib.h>
+
+#define TOKEN_BUFFER_START 64
 
 #ifndef bool
 typedef enum { false, true } bool;
 #endif
 
+token_t *tokens = NULL;
+static int tokens_buffer_size = TOKEN_BUFFER_START;
 static int token_i = 0;
 
 static bool is_whitespace(unsigned char ch) {
@@ -27,9 +32,19 @@ static bool is_string(unsigned char ch) {
     return false;
 }
 
-int sflex(char *data, const char *specials, token_t *tokens) {
+token_t *token_get_next(void) {
+    if (token_i+1 > tokens_buffer_size) {
+        tokens_buffer_size *= 2;
+        tokens = realloc(tokens, tokens_buffer_size);
+    }
+    return &tokens[token_i++];
+}
+
+token_t *sflex(char *data, const char *specials, int *tokens_amt) {
     char ch, lastch;
     
+    tokens = malloc(sizeof(token_t)*TOKEN_BUFFER_START);
+
     bool in_string = false;
     char *newb = data;
     token_t *token = NULL;
@@ -42,7 +57,7 @@ int sflex(char *data, const char *specials, token_t *tokens) {
                 token->end = newb-1;
             while (is_whitespace(*newb))
                 newb++;
-            token = &tokens[token_i++];
+            token = token_get_next();
             if (newb-1 == data)
                 token->start = newb-1;
             else
@@ -53,11 +68,11 @@ int sflex(char *data, const char *specials, token_t *tokens) {
             if (res != NULL) {
                 if (!is_whitespace(lastch) && (token != NULL)) {
                     token->end = newb-1;
-                    token = &tokens[token_i++];
+                    token = token_get_next();
                 }
                 token->start = newb-1;
                 token->end = newb;
-                token = &tokens[token_i++];
+                token = token_get_next();
                 while (is_whitespace(*(newb))) newb++;
                 token->start = newb;
             }
@@ -68,5 +83,6 @@ int sflex(char *data, const char *specials, token_t *tokens) {
     if (tokens[token_i-1].start[0] == 0)
         token_i--;
     
-    return token_i;
+    (*tokens_amt) = token_i;
+    return tokens;
 }

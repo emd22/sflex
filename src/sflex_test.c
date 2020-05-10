@@ -23,10 +23,9 @@ int main() {
         printf("Could not load file\n");
         return 1;
     }
-    token_t tokens[256];
     int token_i, i;
     
-    token_i = sflex(data, "+-*/=:;()", tokens);
+    token_t *tokens = sflex(data, "+-*/=:;()", &token_i);
     for (i = 0; i < token_i; i++) {
         printf("Token: [%.*s]\n", sflex_len(tokens[i]), sflex_tok(tokens[i]));
     }

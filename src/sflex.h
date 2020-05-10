@@ -9,6 +9,6 @@ typedef struct {
     char *end;
 } token_t;
 
-int sflex(char *data, const char *specials, token_t *tokens);
+token_t *sflex(char *data, const char *specials, int *tokens_amt);
 
 #endif
