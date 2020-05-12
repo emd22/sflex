@@ -21,6 +21,7 @@ static int token_i = 0;
 
 #define IS_WHITESPACE(ch) (ch == ' ' || ch == '\t' || ch == '\n')
 #define IS_STRING(ch) (ch == '"' || ch == '\'')
+#define IS_SPECIAL(buf, ch) (strchr(buf, ch) != NULL)
 
 static token_t *token_get_next(void) {
     if (token_i+1 > tokens_buffer_size) {
@@ -38,40 +39,46 @@ token_t *sflex(char *data, const char *specials, int *tokens_amt) {
     bool in_string = false;
     char *newb = data;
     token_t *token = NULL;
-    while (ch = *(newb++)) {
+    
+    while (ch = *(newb)) {
         if (IS_STRING(ch))
             in_string = !in_string;
-            
-        if ((IS_WHITESPACE(ch) || newb-1 == data) && (!in_string)) {
+        
+        // handle whitespace
+        if ((IS_WHITESPACE(ch) || newb == data) && (!in_string)) {
             if (token != NULL)
-                token->end = newb-1;
-            while (IS_WHITESPACE(*newb))
+                token->end = newb;
+            
+            while (IS_WHITESPACE(*(newb+1)))
                 newb++;
+            
             token = token_get_next();
-            if (newb-1 == data)
-                token->start = newb-1;
-            else
+            
+            if (newb == data && !IS_WHITESPACE(ch))
                 token->start = newb;
-        } 
+            else
+                token->start = newb+1;
+        }
+        // handle 'special' characters
         else {
-            char *res = strchr(specials, ch);
-            if (res != NULL) {
-                if (!IS_WHITESPACE(lastch) && (token != NULL)) {
-                    token->end = newb-1;
+            if (IS_SPECIAL(specials, ch) && !in_string) {
+                if (!IS_WHITESPACE(lastch) && !IS_SPECIAL(specials, lastch) && (token != NULL)) {
+                    token->end = newb;
                     token = token_get_next();
                 }
-                token->start = newb-1;
-                token->end = newb;
-                token = token_get_next();
-                while (IS_WHITESPACE(*(newb))) newb++;
                 token->start = newb;
+                token->end = newb+1;
+                token = token_get_next();
+                while (IS_WHITESPACE(*(newb+1)))
+                    newb++;
+                token->start = newb+1;
             }
         }
         lastch = ch;
+        newb++;
     }
     
-    if (tokens[token_i-1].start[0] == 0)
-        token_i--;
+    token_i--;
     
     (*tokens_amt) = token_i;
     return tokens;
