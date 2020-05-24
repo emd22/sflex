@@ -23,12 +23,15 @@ int main() {
         printf("Could not load file\n");
         return 1;
     }
-    int token_i, i;
+    sflex_t inst;
+    inst = sflex(data, "+-*/=:;(){}", SFLEX_USE_STRINGS);
     
-    token_t *tokens = sflex(data, "+-*/=:;()", &token_i);
-    for (i = 0; i < token_i; i++) {
-        printf("Token: [%.*s]\n", sflex_len(tokens[i]), sflex_tok(tokens[i]));
+    int i;
+    for (i = 0; i < inst.token_amt; i++) {
+        printf("Token: [%.*s]\n", sflex_len(inst.tokens[i]), sflex_tok(inst.tokens[i]));
     }
+    
+    sflex_destroy(&inst);
     
     return 0;
 }

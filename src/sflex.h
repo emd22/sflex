@@ -5,71 +5,79 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#define SFLEX_USE_STRINGS 0x01
+
 #define sflex_len(token) (token.end-token.start)
 #define sflex_tok(token) (token.start)
 
 typedef struct {
     char *start;
     char *end;
-} token_t;
+} sflex_token_t;
+
+typedef struct {
+    sflex_token_t *tokens;
+    int token_buffer_size;
+    int token_amt;
+} sflex_t;
 
 #define TOKEN_BUFFER_START 64
 
-token_t *tokens = NULL;
-static int tokens_buffer_size = TOKEN_BUFFER_START;
-static int token_i = 0;
+#define SFLEX_IS_WHITESPACE(ch) (ch == ' ' || ch == '\t' || ch == '\n')
+#define SFLEX_IS_STRING(ch, flags) ((flags & SFLEX_USE_STRINGS) && (ch == '"' || ch == '\''))
+#define SFLEX_IS_SPECIAL(buf, ch) (strchr(buf, ch) != NULL)
 
-#define IS_WHITESPACE(ch) (ch == ' ' || ch == '\t' || ch == '\n')
-#define IS_STRING(ch) (ch == '"' || ch == '\'')
-#define IS_SPECIAL(buf, ch) (strchr(buf, ch) != NULL)
-
-static token_t *token_get_next(void) {
-    if (token_i+1 > tokens_buffer_size) {
-        tokens_buffer_size *= 2;
-        tokens = realloc(tokens, tokens_buffer_size);
+static sflex_token_t *_sflex_token_get_next(sflex_t *inst) {
+    if (inst->token_amt+1 > inst->token_buffer_size) {
+        inst->token_buffer_size *= 2;
+        inst->tokens = realloc(inst->tokens, inst->token_buffer_size);
     }
-    return &tokens[token_i++];
+    return &inst->tokens[inst->token_amt++];
 }
 
-token_t *sflex(char *data, const char *specials, int *tokens_amt) {
+sflex_t sflex(char *data, const char *specials, int flags) {    
     char ch, lastch;
-    
-    tokens = malloc(sizeof(token_t)*TOKEN_BUFFER_START);
+    // Setup sflex structure
+    sflex_t inst;
+    inst.token_buffer_size = TOKEN_BUFFER_START;
+    inst.token_amt = 0;
+    inst.tokens = malloc(sizeof(sflex_token_t)*inst.token_buffer_size);    
 
     bool in_string = false;
+    
     char *newb = data;
-    token_t *token = NULL;
+    sflex_token_t *token = NULL;
     
     while (ch = *(newb)) {
-        if (IS_STRING(ch))
+        if (SFLEX_IS_STRING(ch, flags))
             in_string = !in_string;
         
         // handle whitespace
-        if ((IS_WHITESPACE(ch) || newb == data) && (!in_string)) {
+        if ((SFLEX_IS_WHITESPACE(ch) || newb == data) && (!in_string)) {
             if (token != NULL)
                 token->end = newb;
             
-            while (IS_WHITESPACE(*(newb+1)))
+            while (SFLEX_IS_WHITESPACE(*(newb+1)))
                 newb++;
             
-            token = token_get_next();
+            token = _sflex_token_get_next(&inst);
             
-            if (newb == data && !IS_WHITESPACE(ch))
+            if (newb == data && !SFLEX_IS_WHITESPACE(ch))
                 token->start = newb;
             else
                 token->start = newb+1;
         }
         // handle 'special' characters
         else {
-            if (IS_SPECIAL(specials, ch) && !in_string) {
-                if (!IS_WHITESPACE(lastch) && !IS_SPECIAL(specials, lastch) && (token != NULL)) {
+            if (specials != NULL && SFLEX_IS_SPECIAL(specials, ch) && !in_string) {
+                if (!SFLEX_IS_WHITESPACE(lastch) && !SFLEX_IS_SPECIAL(specials, lastch) && (token != NULL)) {
                     token->end = newb;
-                    token = token_get_next();
+                    token = _sflex_token_get_next(&inst);
                 }
                 token->start = newb;
                 token->end = newb+1;
-                token = token_get_next();
-                while (IS_WHITESPACE(*(newb+1)))
+                token = _sflex_token_get_next(&inst);
+                while (SFLEX_IS_WHITESPACE(*(newb+1)))
                     newb++;
                 token->start = newb+1;
             }
@@ -78,10 +86,19 @@ token_t *sflex(char *data, const char *specials, int *tokens_amt) {
         newb++;
     }
     
-    token_i--;
-    
-    (*tokens_amt) = token_i;
-    return tokens;
+    // chop off empty token at end
+    inst.token_amt--;
+    return inst;
+}
+
+void sflex_destroy(sflex_t *inst) {
+    if (inst == NULL)
+        return;
+        
+    if (inst->tokens != NULL)
+        free(inst->tokens);
+    inst->token_amt = 0;
+    inst->token_buffer_size = 0;
 }
 
 #endif
