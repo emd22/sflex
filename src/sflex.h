@@ -3,6 +3,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdbool.h>
 
 #define SFLEX_USE_STRINGS 0x01
@@ -52,8 +53,18 @@ sflex_t sflex(char *data, const char *specials, int flags) {
         if (SFLEX_IS_STRING(ch, flags))
             in_string = !in_string;
         
+        // first character in string
+        if (newb == data) {
+            // token is not initialized, create new one
+            token = _sflex_token_get_next(&inst);
+            //
+            if (!SFLEX_IS_WHITESPACE(ch)) {
+                token->start = newb;
+            }
+        }
+        
         // handle whitespace
-        if ((SFLEX_IS_WHITESPACE(ch) || newb == data) && (!in_string)) {
+        if ((SFLEX_IS_WHITESPACE(ch)) && (!in_string)) {
             if (token != NULL)
                 token->end = newb;
             
@@ -61,11 +72,7 @@ sflex_t sflex(char *data, const char *specials, int flags) {
                 newb++;
             
             token = _sflex_token_get_next(&inst);
-            
-            if (newb == data && !SFLEX_IS_WHITESPACE(ch))
-                token->start = newb;
-            else
-                token->start = newb+1;
+            token->start = newb+1;
         }
         // handle 'special' characters
         else {
